@@ -28,7 +28,20 @@ jobs:
           cache-dependency-path: go.sum
 
       - name: Test
-        run: go test ./...
+        shell: bash
+        run: |
+          set +e
+          output="$(go test -count=1 ./... 2>&1)"
+          status=$?
+          printf '%s\n' "${output}"
+
+          if (( status != 0 )); then
+            output="${output//'%'/'%25'}"
+            output="${output//$'\r'/'%0D'}"
+            output="${output//$'\n'/'%0A'}"
+            echo "::error title=Go test failure::${output}"
+            exit "${status}"
+          fi
 
       - name: Vet
         run: go vet ./...
