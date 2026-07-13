@@ -305,19 +305,6 @@ func runAgentTask(ctx context.Context, arguments []string, stdout, stderr io.Wri
 		return 2
 	}
 
-	registry := agent.Detect()
-	var provider agent.Provider
-	if agentName == "" {
-		provider, ok = registry.Default()
-	} else {
-		provider, ok = registry.Find(agentName)
-	}
-	if !ok {
-		fmt.Fprintln(stderr, "no requested review backend is available; inspect choices with tarakan --agents")
-		return 1
-	}
-	provider = provider.WithModel(model)
-
 	client, err := cfg.Client()
 	if err != nil {
 		return printAPIConfigurationError(stderr, err)
@@ -343,6 +330,19 @@ func runAgentTask(ctx context.Context, arguments []string, stdout, stderr io.Wri
 		fmt.Fprintf(stderr, "task %d cannot run an agent while repository participation mode is %q; maintainer verification or curation is required\n", task.ID, valueOrUnknown(task.Repository.ParticipationMode))
 		return 1
 	}
+
+	registry := agent.Detect()
+	var provider agent.Provider
+	if agentName == "" {
+		provider, ok = registry.Default()
+	} else {
+		provider, ok = registry.Find(agentName)
+	}
+	if !ok {
+		fmt.Fprintln(stderr, "no requested review backend is available; inspect choices with tarakan --agents")
+		return 1
+	}
+	provider = provider.WithModel(model)
 
 	repository, err := repoctx.Current()
 	if err != nil {

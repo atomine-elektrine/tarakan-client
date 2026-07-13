@@ -265,12 +265,8 @@ func TestRunTaskRejectsHumanAndHybridCapabilityBeforeClaim(t *testing.T) {
 
 			var stdout, stderr bytes.Buffer
 			code := run([]string{"run-task", "4"}, strings.NewReader(""), &stdout, &stderr)
-			// Agent detection happens before the task fetch on systems without a
-			// supported CLI, so this assertion only applies when one is installed.
-			if !strings.Contains(stderr.String(), "no requested supported agent") {
-				if code == 0 || claimed || !strings.Contains(stderr.String(), "only automates") {
-					t.Fatalf("exit = %d, claimed = %v, stderr = %s", code, claimed, stderr.String())
-				}
+			if code == 0 || claimed || !strings.Contains(stderr.String(), "only automates") {
+				t.Fatalf("exit = %d, claimed = %v, stderr = %s", code, claimed, stderr.String())
 			}
 		})
 	}
