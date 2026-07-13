@@ -1,0 +1,6 @@
+/bin/
+/dist/
+/.tarakan/
+*.log
+coverage.out
+/test
