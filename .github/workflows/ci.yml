@@ -129,9 +129,19 @@ jobs:
           path: dist/
 
       - name: Create release
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        run: >-
-          gh release create "${GITHUB_REF_NAME}" dist/*
-          --verify-tag
-          --generate-notes
+        run: |
+          set +e
+          output="$(gh release create "${GITHUB_REF_NAME}" dist/* --verify-tag --generate-notes 2>&1)"
+          status=$?
+          printf '%s\n' "${output}"
+
+          if (( status != 0 )); then
+            output="${output//'%'/'%25'}"
+            output="${output//$'\r'/'%0D'}"
+            output="${output//$'\n'/'%0A'}"
+            echo "::error title=GitHub release failure::${output}"
+            exit "${status}"
+          fi
