@@ -150,19 +150,53 @@ func reviewFocus(kind string) string {
 	}
 }
 
-// Parse extracts a ScanDocument from agent output, tolerating prose wrappers.
+// Parse extracts a ScanDocument from agent output, tolerating prose wrappers,
+// markdown fences, and truncated streams that still contain complete findings.
 func Parse(output string) (api.ScanDocument, error) {
-	raw, ok := LastJSONObject(output)
-	if !ok {
-		return api.ScanDocument{}, errors.New("agent did not return a JSON object")
+	var lastJSONErr error
+	sawCompleteScanFormat := false
+	for _, raw := range scanFormatCandidates(output) {
+		if hasScanFormatMarker(raw) {
+			sawCompleteScanFormat = true
+		}
+		doc, err := parseEnvelope(raw)
+		if err != nil {
+			lastJSONErr = err
+			continue
+		}
+		return doc, nil
 	}
+
+	// Only salvage when no complete Scan Format object closed — do not rewrite
+	// a fully-parsed document that failed validation (e.g. wrong format version).
+	if !sawCompleteScanFormat {
+		if salvaged, ok := salvageTruncatedScanDocument(output); ok {
+			return salvaged, nil
+		}
+	}
+
+	if lastJSONErr != nil {
+		if !sawCompleteScanFormat && looksTruncatedScanFormat(output) {
+			return api.ScanDocument{}, fmt.Errorf(
+				"agent output was truncated mid-Review Format JSON (incomplete stream): %w", lastJSONErr)
+		}
+		return api.ScanDocument{}, fmt.Errorf("agent output was not valid Review Format JSON: %w", lastJSONErr)
+	}
+	if looksTruncatedScanFormat(output) {
+		return api.ScanDocument{}, errors.New(
+			"agent output was truncated mid-Review Format JSON before any complete findings could be recovered")
+	}
+	return api.ScanDocument{}, errors.New("agent did not return a JSON object")
+}
+
+func parseEnvelope(raw string) (api.ScanDocument, error) {
 	var envelope struct {
 		ScanFormat   *int64            `json:"tarakan_scan_format"`
 		ReviewFormat *int64            `json:"tarakan_review_format"`
 		Findings     []api.ScanFinding `json:"findings"`
 	}
 	if err := json.Unmarshal([]byte(raw), &envelope); err != nil {
-		return api.ScanDocument{}, fmt.Errorf("agent output was not valid Review Format JSON: %w", err)
+		return api.ScanDocument{}, err
 	}
 	format := envelope.ScanFormat
 	if format == nil {
@@ -175,21 +209,247 @@ func Parse(output string) (api.ScanDocument, error) {
 	if doc.Findings == nil {
 		return api.ScanDocument{}, errors.New("agent output must include a findings array")
 	}
-	for i := range doc.Findings {
-		doc.Findings[i].Title = truncate(strings.TrimSpace(doc.Findings[i].Title), 200)
-		doc.Findings[i].Description = normalizeFindingDescription(doc.Findings[i].Description)
-		doc.Findings[i].Description = truncate(doc.Findings[i].Description, 10_000)
-		doc.Findings[i].File = strings.TrimSpace(doc.Findings[i].File)
-		doc.Findings[i].Severity = strings.ToLower(strings.TrimSpace(doc.Findings[i].Severity))
-		doc.Findings[i].Disposition = strings.ToLower(strings.TrimSpace(doc.Findings[i].Disposition))
-		if doc.Findings[i].Disposition == "" {
-			doc.Findings[i].Disposition = "new"
-		}
-	}
+	normalizeFindings(doc.Findings)
 	if err := Validate(doc); err != nil {
 		return api.ScanDocument{}, err
 	}
 	return doc, nil
+}
+
+func normalizeFindings(findings []api.ScanFinding) {
+	for i := range findings {
+		findings[i].Title = truncate(strings.TrimSpace(findings[i].Title), 200)
+		findings[i].Description = normalizeFindingDescription(findings[i].Description)
+		findings[i].Description = truncate(findings[i].Description, 10_000)
+		findings[i].File = strings.TrimSpace(findings[i].File)
+		findings[i].Severity = strings.ToLower(strings.TrimSpace(findings[i].Severity))
+		findings[i].Disposition = strings.ToLower(strings.TrimSpace(findings[i].Disposition))
+		if findings[i].Disposition == "" {
+			findings[i].Disposition = "new"
+		}
+	}
+}
+
+// scanFormatCandidates returns balanced JSON objects most likely to be Scan
+// Format, preferring objects that name the format marker.
+func scanFormatCandidates(output string) []string {
+	objects := JSONObjects(output)
+	if len(objects) == 0 {
+		return nil
+	}
+	var marked, rest []string
+	for _, obj := range objects {
+		if hasScanFormatMarker(obj) {
+			marked = append(marked, obj)
+		} else {
+			rest = append(rest, obj)
+		}
+	}
+	// Prefer later marked objects (agent often revises), then other JSON.
+	// reverse(marked) so last complete document is tried first.
+	reverseStrings(marked)
+	reverseStrings(rest)
+	return append(marked, rest...)
+}
+
+func hasScanFormatMarker(s string) bool {
+	return strings.Contains(s, `"tarakan_scan_format"`) ||
+		strings.Contains(s, `"tarakan_review_format"`)
+}
+
+func looksTruncatedScanFormat(output string) bool {
+	return strings.Contains(output, `"tarakan_scan_format"`) ||
+		strings.Contains(output, `"tarakan_review_format"`)
+}
+
+// salvageTruncatedScanDocument recovers complete findings from a stream that
+// started a Scan Format object but never closed it (common when agents hit
+// output token limits mid-description).
+func salvageTruncatedScanDocument(output string) (api.ScanDocument, bool) {
+	start := indexScanFormatObject(output)
+	if start < 0 {
+		return api.ScanDocument{}, false
+	}
+	fragment := output[start:]
+	findingsStart := indexFindingsArray(fragment)
+	if findingsStart < 0 {
+		// Empty or missing findings array in a truncated object.
+		if strings.Contains(fragment, `"findings"`) {
+			// Could be `"findings": []` with outer object truncated after.
+			if empty := tryEmptyFindings(fragment); empty {
+				doc := api.ScanDocument{Format: 1, Findings: []api.ScanFinding{}}
+				return doc, true
+			}
+		}
+		return api.ScanDocument{}, false
+	}
+	// findingsStart points at '[' of the findings array.
+	arrayInterior := fragment[findingsStart+1:]
+	findings := extractCompleteArrayObjects(arrayInterior)
+	if len(findings) == 0 {
+		// Truncated before first finding completed — only accept if the array
+		// was clearly closed empty (`[]`), even when the outer object is not.
+		if emptyFindingsArrayClosed(arrayInterior) {
+			return api.ScanDocument{Format: 1, Findings: []api.ScanFinding{}}, true
+		}
+		return api.ScanDocument{}, false
+	}
+	normalizeFindings(findings)
+	doc := api.ScanDocument{Format: 1, Findings: findings}
+	if err := Validate(doc); err != nil {
+		// Drop invalid trailing partial salvage noise; keep prefix that validates.
+		for n := len(findings); n > 0; n-- {
+			candidate := api.ScanDocument{Format: 1, Findings: findings[:n]}
+			if err := Validate(candidate); err == nil {
+				return candidate, true
+			}
+		}
+		return api.ScanDocument{}, false
+	}
+	return doc, true
+}
+
+func tryEmptyFindings(fragment string) bool {
+	// Match `"findings": []` allowing whitespace.
+	i := strings.Index(fragment, `"findings"`)
+	if i < 0 {
+		return false
+	}
+	rest := fragment[i+len(`"findings"`):]
+	rest = strings.TrimLeftFunc(rest, unicode.IsSpace)
+	if !strings.HasPrefix(rest, ":") {
+		return false
+	}
+	rest = strings.TrimLeftFunc(rest[1:], unicode.IsSpace)
+	return strings.HasPrefix(rest, "[]")
+}
+
+func emptyFindingsArrayClosed(arrayInterior string) bool {
+	i := 0
+	for i < len(arrayInterior) && isJSONSpace(arrayInterior[i]) {
+		i++
+	}
+	return i < len(arrayInterior) && arrayInterior[i] == ']'
+}
+
+func indexScanFormatObject(s string) int {
+	// Prefer the rightmost format marker (agents often emit the document last).
+	markerAt := -1
+	for _, marker := range []string{`"tarakan_scan_format"`, `"tarakan_review_format"`} {
+		if i := strings.LastIndex(s, marker); i > markerAt {
+			markerAt = i
+		}
+	}
+	if markerAt < 0 {
+		return -1
+	}
+	// Forward scan so braces inside strings are ignored when locating the
+	// outermost object that contains the marker.
+	depth := 0
+	inString := false
+	escape := false
+	start := -1
+	for i := 0; i <= markerAt && i < len(s); i++ {
+		c := s[i]
+		if inString {
+			if escape {
+				escape = false
+				continue
+			}
+			switch c {
+			case '\\':
+				escape = true
+			case '"':
+				inString = false
+			}
+			continue
+		}
+		switch c {
+		case '"':
+			inString = true
+		case '{':
+			if depth == 0 {
+				start = i
+			}
+			depth++
+		case '}':
+			if depth > 0 {
+				depth--
+			}
+			if depth == 0 {
+				start = -1
+			}
+		}
+	}
+	return start
+}
+
+func indexFindingsArray(fragment string) int {
+	// Find `"findings"` then the following '[' — fragments are marker-led Scan
+	// Format objects, so a simple scan is enough.
+	key := `"findings"`
+	i := strings.Index(fragment, key)
+	if i < 0 {
+		return -1
+	}
+	rest := fragment[i+len(key):]
+	offset := i + len(key)
+	for j := 0; j < len(rest); j++ {
+		c := rest[j]
+		if isJSONSpace(c) || c == ':' {
+			continue
+		}
+		if c == '[' {
+			return offset + j
+		}
+		return -1
+	}
+	return -1
+}
+
+// extractCompleteArrayObjects reads successive balanced JSON objects from the
+// interior of an array, stopping at the first incomplete object or array end.
+func extractCompleteArrayObjects(arrayInterior string) []api.ScanFinding {
+	var findings []api.ScanFinding
+	i := 0
+	for i < len(arrayInterior) {
+		for i < len(arrayInterior) && (isJSONSpace(arrayInterior[i]) || arrayInterior[i] == ',') {
+			i++
+		}
+		if i >= len(arrayInterior) {
+			break
+		}
+		if arrayInterior[i] == ']' {
+			break
+		}
+		if arrayInterior[i] != '{' {
+			// Unexpected token; stop salvaging.
+			break
+		}
+		obj, end, ok := balancedJSONObjectAt(arrayInterior, i)
+		if !ok {
+			// Incomplete object (truncation); keep findings collected so far.
+			break
+		}
+		var finding api.ScanFinding
+		if err := json.Unmarshal([]byte(obj), &finding); err != nil {
+			// Malformed complete object; stop rather than inventing data.
+			break
+		}
+		findings = append(findings, finding)
+		i = end
+	}
+	return findings
+}
+
+func isJSONSpace(c byte) bool {
+	return c == ' ' || c == '\t' || c == '\n' || c == '\r'
+}
+
+func reverseStrings(s []string) {
+	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
+		s[i], s[j] = s[j], s[i]
+	}
 }
 
 // Validate enforces the same important Review Format invariants as the server,
@@ -308,24 +568,79 @@ func truncate(s string, max int) string {
 }
 
 // LastJSONObject extracts the last balanced top-level JSON object from agent
-// output while ignoring braces inside strings.
+// output while ignoring braces inside strings. Objects that cannot be JSON
+// (e.g. Elixir `{:atom, _}` tuples) are skipped.
 func LastJSONObject(s string) (string, bool) {
-	end := -1
-	for i := len(s) - 1; i >= 0; i-- {
-		if s[i] == '}' {
-			end = i
-			break
-		}
-	}
-	if end == -1 {
+	objects := JSONObjects(s)
+	if len(objects) == 0 {
 		return "", false
+	}
+	return objects[len(objects)-1], true
+}
+
+// JSONObjects returns every balanced top-level JSON object in s, in order of
+// appearance. Non-JSON brace groups (Elixir tuples, Go composite literals with
+// unquoted keys, etc.) are skipped.
+func JSONObjects(s string) []string {
+	var out []string
+	for i := 0; i < len(s); i++ {
+		if s[i] != '{' {
+			continue
+		}
+		if !looksLikeJSONObjectStart(s, i) {
+			continue
+		}
+		obj, end, ok := balancedJSONObjectAt(s, i)
+		if !ok {
+			continue
+		}
+		out = append(out, obj)
+		// Continue after this object so nested objects are not double-counted
+		// as top-level; nested content is part of the parent extraction only.
+		i = end - 1
+	}
+	return out
+}
+
+// looksLikeJSONObjectStart reports whether s[i] begins something that could be
+// a JSON object: '{' then optional space then '"' (key) or '}'.
+func looksLikeJSONObjectStart(s string, i int) bool {
+	if i >= len(s) || s[i] != '{' {
+		return false
+	}
+	j := i + 1
+	for j < len(s) && isJSONSpace(s[j]) {
+		j++
+	}
+	if j >= len(s) {
+		// Truncated after '{'; not a complete object (salvage handles partials).
+		return false
+	}
+	// JSON objects use quoted keys (or are empty). Reject Elixir {:atom, _} and
+	// similar brace groups that would confuse encoding/json.
+	return s[j] == '"' || s[j] == '}'
+}
+
+// balancedJSONObjectAt returns the JSON object starting at s[start] ('{') and
+// the index just past its closing '}'. ok is false if braces never balance.
+func balancedJSONObjectAt(s string, start int) (string, int, bool) {
+	if start < 0 || start >= len(s) || s[start] != '{' {
+		return "", start, false
 	}
 	depth := 0
 	inString := false
-	for i := end; i >= 0; i-- {
+	escape := false
+	for i := start; i < len(s); i++ {
 		c := s[i]
 		if inString {
-			if c == '"' && !isEscapedBackwards(s, i) {
+			if escape {
+				escape = false
+				continue
+			}
+			switch c {
+			case '\\':
+				escape = true
+			case '"':
 				inString = false
 			}
 			continue
@@ -333,22 +648,14 @@ func LastJSONObject(s string) (string, bool) {
 		switch c {
 		case '"':
 			inString = true
-		case '}':
-			depth++
 		case '{':
+			depth++
+		case '}':
 			depth--
 			if depth == 0 {
-				return s[i : end+1], true
+				return s[start : i+1], i + 1, true
 			}
 		}
 	}
-	return "", false
-}
-
-func isEscapedBackwards(s string, i int) bool {
-	slashes := 0
-	for j := i - 1; j >= 0 && s[j] == '\\'; j-- {
-		slashes++
-	}
-	return slashes%2 == 1
+	return "", start, false
 }

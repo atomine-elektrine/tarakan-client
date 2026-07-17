@@ -16,6 +16,7 @@ import (
 	repoctx "github.com/atomine-elektrine/tarakan-client/internal/context"
 	"github.com/atomine-elektrine/tarakan-client/internal/reviewdoc"
 	"github.com/atomine-elektrine/tarakan-client/internal/snapshot"
+	"github.com/atomine-elektrine/tarakan-client/internal/updatecheck"
 )
 
 // runReport is the mass-facing path: run a local agent, produce Review Format
@@ -78,6 +79,7 @@ func runReport(ctx context.Context, arguments []string, stdin io.Reader, stdout,
 		fmt.Fprintln(stderr, err)
 		return 2
 	}
+	updatecheck.MaybeNotify(stderr, version)
 	if interactive || pickup {
 		if yes {
 			fmt.Fprintln(stderr, "use either --interactive/--pickup or --yes, not both")

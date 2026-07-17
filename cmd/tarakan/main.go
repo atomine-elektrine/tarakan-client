@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -18,9 +19,11 @@ import (
 	"github.com/atomine-elektrine/tarakan-client/internal/app"
 	repoctx "github.com/atomine-elektrine/tarakan-client/internal/context"
 	"github.com/atomine-elektrine/tarakan-client/internal/headless"
+	"github.com/atomine-elektrine/tarakan-client/internal/updatecheck"
 )
 
-const version = "0.2.0"
+// version is the client release (override with -ldflags "-X main.version=…").
+var version = "0.2.2"
 
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
@@ -94,6 +97,13 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	if printVersion {
 		fmt.Fprintln(stdout, version)
+		// Best-effort: show whether a newer release exists (stderr keeps stdout machine-friendly).
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		result, err := updatecheck.Check(ctx, version)
+		cancel()
+		if err == nil && result.UpdateAvailable {
+			fmt.Fprintln(stderr, result.Notice())
+		}
 		return 0
 	}
 
@@ -153,6 +163,9 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "no review backend available; install grok/codex/claude or pass --agent")
 		return 1
 	}
+
+	// Surfaces "newer release available" before long agent runs / TUI work.
+	updatecheck.MaybeNotify(stderr, version)
 
 	program := tea.NewProgram(app.NewSession(repository, registry, selected, app.SessionOpts{
 		JobID:     jobID,

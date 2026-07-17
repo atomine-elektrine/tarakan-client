@@ -12,6 +12,7 @@ import (
 	"github.com/atomine-elektrine/tarakan-client/internal/api"
 	"github.com/atomine-elektrine/tarakan-client/internal/app"
 	repoctx "github.com/atomine-elektrine/tarakan-client/internal/context"
+	"github.com/atomine-elektrine/tarakan-client/internal/updatecheck"
 )
 
 func runWorker(ctx context.Context, arguments []string, stdout, stderr io.Writer, cfg api.Config) int {
@@ -59,6 +60,7 @@ func runWorker(ctx context.Context, arguments []string, stdout, stderr io.Writer
 	}
 	provider = provider.WithModel(model)
 	local, _ := repoctx.Current()
+	updatecheck.MaybeNotify(stderr, version)
 
 	err = app.RunWorker(ctx, app.WorkerOptions{
 		APIConfig:       cfg,

@@ -12,6 +12,7 @@ import (
 
 	"github.com/atomine-elektrine/tarakan-client/internal/api"
 	"github.com/atomine-elektrine/tarakan-client/internal/browser"
+	"github.com/atomine-elektrine/tarakan-client/internal/updatecheck"
 )
 
 func runLogin(arguments []string, stdout, stderr io.Writer, config api.Config, explicitToken string) int {
@@ -111,6 +112,7 @@ func saveLogin(stdout, stderr io.Writer, config api.Config, token string) int {
 		return 1
 	}
 	fmt.Fprintf(stdout, "Logged in to %s. Credentials saved to %s (mode 0600).\n", config.BaseURL, path)
+	updatecheck.MaybeNotify(stderr, version)
 	return 0
 }
 

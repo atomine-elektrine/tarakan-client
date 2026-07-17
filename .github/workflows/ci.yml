@@ -89,8 +89,10 @@ jobs:
               binary="tarakan.exe"
             fi
 
+            # Strip leading v from tags so main.version matches tarakan --version.
+            version_ld="${version#v}"
             CGO_ENABLED=0 GOOS="${goos}" GOARCH="${goarch}" \
-              go build -trimpath -ldflags="-s -w" \
+              go build -trimpath -ldflags="-s -w -X main.version=${version_ld}" \
               -o "${package}/${binary}" ./cmd/tarakan
 
             cp LICENSE "${package}/"
