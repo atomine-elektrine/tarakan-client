@@ -9,10 +9,10 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"tarakan-client/internal/agent"
-	"tarakan-client/internal/api"
-	repoctx "tarakan-client/internal/context"
-	"tarakan-client/internal/session"
+	"github.com/atomine-elektrine/tarakan-client/internal/agent"
+	"github.com/atomine-elektrine/tarakan-client/internal/api"
+	repoctx "github.com/atomine-elektrine/tarakan-client/internal/context"
+	"github.com/atomine-elektrine/tarakan-client/internal/session"
 )
 
 const (

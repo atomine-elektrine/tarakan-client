@@ -13,14 +13,14 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"tarakan-client/internal/agent"
-	"tarakan-client/internal/api"
-	"tarakan-client/internal/app"
-	repoctx "tarakan-client/internal/context"
-	"tarakan-client/internal/headless"
+	"github.com/atomine-elektrine/tarakan-client/internal/agent"
+	"github.com/atomine-elektrine/tarakan-client/internal/api"
+	"github.com/atomine-elektrine/tarakan-client/internal/app"
+	repoctx "github.com/atomine-elektrine/tarakan-client/internal/context"
+	"github.com/atomine-elektrine/tarakan-client/internal/headless"
 )
 
-const version = "0.1.0-dev"
+const version = "0.2.0"
 
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))

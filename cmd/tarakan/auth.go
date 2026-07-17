@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"tarakan-client/internal/api"
-	"tarakan-client/internal/browser"
+	"github.com/atomine-elektrine/tarakan-client/internal/api"
+	"github.com/atomine-elektrine/tarakan-client/internal/browser"
 )
 
 func runLogin(arguments []string, stdout, stderr io.Writer, config api.Config, explicitToken string) int {

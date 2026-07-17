@@ -3,9 +3,9 @@ package app
 import (
 	"testing"
 
-	"tarakan-client/internal/agent"
-	repoctx "tarakan-client/internal/context"
-	"tarakan-client/internal/session"
+	"github.com/atomine-elektrine/tarakan-client/internal/agent"
+	repoctx "github.com/atomine-elektrine/tarakan-client/internal/context"
+	"github.com/atomine-elektrine/tarakan-client/internal/session"
 )
 
 func TestIsAgentStreamLine(t *testing.T) {

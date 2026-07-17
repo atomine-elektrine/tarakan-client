@@ -3,9 +3,9 @@ package app
 import (
 	"testing"
 
-	"tarakan-client/internal/agent"
-	"tarakan-client/internal/api"
-	repoctx "tarakan-client/internal/context"
+	"github.com/atomine-elektrine/tarakan-client/internal/agent"
+	"github.com/atomine-elektrine/tarakan-client/internal/api"
+	repoctx "github.com/atomine-elektrine/tarakan-client/internal/context"
 )
 
 func TestLoginCommandStartsBrowserAuthorization(t *testing.T) {

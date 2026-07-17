@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"tarakan-client/internal/agent"
-	"tarakan-client/internal/api"
-	"tarakan-client/internal/app"
-	repoctx "tarakan-client/internal/context"
+	"github.com/atomine-elektrine/tarakan-client/internal/agent"
+	"github.com/atomine-elektrine/tarakan-client/internal/api"
+	"github.com/atomine-elektrine/tarakan-client/internal/app"
+	repoctx "github.com/atomine-elektrine/tarakan-client/internal/context"
 )
 
 func runWorker(ctx context.Context, arguments []string, stdout, stderr io.Writer, cfg api.Config) int {

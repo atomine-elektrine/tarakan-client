@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"tarakan-client/internal/api"
-	repoctx "tarakan-client/internal/context"
+	"github.com/atomine-elektrine/tarakan-client/internal/api"
+	repoctx "github.com/atomine-elektrine/tarakan-client/internal/context"
 )
 
 func TestCloneRemoteURLTarakanPrefersAPIBase(t *testing.T) {

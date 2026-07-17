@@ -11,11 +11,11 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"tarakan-client/internal/agent"
-	"tarakan-client/internal/api"
-	repoctx "tarakan-client/internal/context"
-	"tarakan-client/internal/reviewdoc"
-	"tarakan-client/internal/snapshot"
+	"github.com/atomine-elektrine/tarakan-client/internal/agent"
+	"github.com/atomine-elektrine/tarakan-client/internal/api"
+	repoctx "github.com/atomine-elektrine/tarakan-client/internal/context"
+	"github.com/atomine-elektrine/tarakan-client/internal/reviewdoc"
+	"github.com/atomine-elektrine/tarakan-client/internal/snapshot"
 )
 
 // runReport is the mass-facing path: run a local agent, produce Review Format

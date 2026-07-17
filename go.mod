@@ -1,4 +1,4 @@
-module tarakan-client
+module github.com/atomine-elektrine/tarakan-client
 
 go 1.25.0
 

@@ -12,9 +12,9 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"tarakan-client/internal/agent"
-	"tarakan-client/internal/api"
-	repoctx "tarakan-client/internal/context"
+	"github.com/atomine-elektrine/tarakan-client/internal/agent"
+	"github.com/atomine-elektrine/tarakan-client/internal/api"
+	repoctx "github.com/atomine-elektrine/tarakan-client/internal/context"
 )
 
 func TestWorkerClaimsRunsAndSubmitsAgentJob(t *testing.T) {

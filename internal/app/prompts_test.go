@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"tarakan-client/internal/reviewdoc"
+	"github.com/atomine-elektrine/tarakan-client/internal/reviewdoc"
 )
 
 func TestLastJSONObjectIgnoresProseAndFences(t *testing.T) {

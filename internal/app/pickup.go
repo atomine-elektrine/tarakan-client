@@ -3,8 +3,8 @@ package app
 import (
 	"strings"
 
-	"tarakan-client/internal/api"
-	"tarakan-client/internal/reviewdoc"
+	"github.com/atomine-elektrine/tarakan-client/internal/api"
+	"github.com/atomine-elektrine/tarakan-client/internal/reviewdoc"
 )
 
 // isPickable reports whether a job from the queue can be worked (/report).

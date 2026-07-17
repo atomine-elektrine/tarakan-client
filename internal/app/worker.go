@@ -12,10 +12,10 @@ import (
 	"sync"
 	"time"
 
-	"tarakan-client/internal/agent"
-	"tarakan-client/internal/api"
-	repoctx "tarakan-client/internal/context"
-	"tarakan-client/internal/reviewdoc"
+	"github.com/atomine-elektrine/tarakan-client/internal/agent"
+	"github.com/atomine-elektrine/tarakan-client/internal/api"
+	repoctx "github.com/atomine-elektrine/tarakan-client/internal/context"
+	"github.com/atomine-elektrine/tarakan-client/internal/reviewdoc"
 )
 
 // WorkerOptions configures the durable, headless Job consumer.

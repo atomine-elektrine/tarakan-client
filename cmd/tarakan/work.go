@@ -15,11 +15,11 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"tarakan-client/internal/agent"
-	"tarakan-client/internal/api"
-	repoctx "tarakan-client/internal/context"
-	"tarakan-client/internal/reviewdoc"
-	"tarakan-client/internal/snapshot"
+	"github.com/atomine-elektrine/tarakan-client/internal/agent"
+	"github.com/atomine-elektrine/tarakan-client/internal/api"
+	repoctx "github.com/atomine-elektrine/tarakan-client/internal/context"
+	"github.com/atomine-elektrine/tarakan-client/internal/reviewdoc"
+	"github.com/atomine-elektrine/tarakan-client/internal/snapshot"
 )
 
 var workCommands = map[string]struct{}{
@@ -157,7 +157,7 @@ func runSubmit(ctx context.Context, invokedAs string, arguments []string, stdin 
 	flags.StringVar(&evidenceFile, "evidence-file", "", "legacy prose evidence file, or - for stdin")
 	flags.StringVar(&documentFile, "document-file", "", "Review/Scan Format JSON file (preferred; creates Findings)")
 	flags.StringVar(&model, "model", "", "model name when provenance is agent/hybrid")
-	flags.StringVar(&promptVersion, "prompt-version", "tarakan-client/v2", "prompt version label for agent reviews")
+	flags.StringVar(&promptVersion, "prompt-version", "github.com/atomine-elektrine/tarakan-client/v2", "prompt version label for agent reviews")
 	flags.StringVar(&verdict, "verdict", "", "for verify_findings: confirmed or disputed")
 	flags.StringVar(&notes, "notes", "", "for verify_findings: rationale (≥20 chars); defaults to --summary")
 	addAPIFlags(flags, &urlFlag, &hostFlag, &tokenFlag)

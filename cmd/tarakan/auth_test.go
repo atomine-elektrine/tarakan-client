@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"tarakan-client/internal/api"
+	"github.com/atomine-elektrine/tarakan-client/internal/api"
 )
 
 func TestLoginSavesTokenForFutureRuns(t *testing.T) {

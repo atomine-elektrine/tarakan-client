@@ -10,7 +10,7 @@ import (
 	"strings"
 	"unicode"
 
-	"tarakan-client/internal/api"
+	"github.com/atomine-elektrine/tarakan-client/internal/api"
 )
 
 // FindingKinds produce structured Reviews when completed with a Format document.

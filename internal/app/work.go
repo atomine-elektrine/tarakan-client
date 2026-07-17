@@ -10,11 +10,11 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"tarakan-client/internal/agent"
-	"tarakan-client/internal/api"
-	"tarakan-client/internal/reviewdoc"
-	"tarakan-client/internal/session"
-	"tarakan-client/internal/snapshot"
+	"github.com/atomine-elektrine/tarakan-client/internal/agent"
+	"github.com/atomine-elektrine/tarakan-client/internal/api"
+	"github.com/atomine-elektrine/tarakan-client/internal/reviewdoc"
+	"github.com/atomine-elektrine/tarakan-client/internal/session"
+	"github.com/atomine-elektrine/tarakan-client/internal/snapshot"
 )
 
 // workEvent is one live update from a background job (progress line and/or final result).
@@ -566,7 +566,7 @@ func (m Model) runReportJob(id int64) func(report func(string)) tea.Msg {
 			taskID:        id,
 			title:         task.Title,
 			model:         modelID,
-			promptVersion: "tarakan-client/v2",
+			promptVersion: "github.com/atomine-elektrine/tarakan-client/v2",
 			document:      doc,
 		}
 	})
@@ -714,7 +714,7 @@ func (m Model) handleSubmitReview() (tea.Model, tea.Cmd) {
 	return m.startWork("Submitting review…", m.withClient(func(client *api.Client) tea.Msg {
 		scan, err := client.SubmitScanForHost(context.Background(), p.host, p.owner, p.name, api.ScanSubmission{
 			CommitSHA: p.commit, Provenance: "agent", ReviewKind: "code_review",
-			Model: p.model, PromptVersion: "tarakan-client/v2", RunID: p.runID, Document: p.document,
+			Model: p.model, PromptVersion: "github.com/atomine-elektrine/tarakan-client/v2", RunID: p.runID, Document: p.document,
 		})
 		if err != nil {
 			return noticeMsg{err: err}

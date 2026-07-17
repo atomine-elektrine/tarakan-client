@@ -10,9 +10,9 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"tarakan-client/internal/api"
-	"tarakan-client/internal/browser"
-	"tarakan-client/internal/session"
+	"github.com/atomine-elektrine/tarakan-client/internal/api"
+	"github.com/atomine-elektrine/tarakan-client/internal/browser"
+	"github.com/atomine-elektrine/tarakan-client/internal/session"
 )
 
 type pendingLogin struct {

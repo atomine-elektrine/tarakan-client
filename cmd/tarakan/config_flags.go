@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"tarakan-client/internal/api"
+	"github.com/atomine-elektrine/tarakan-client/internal/api"
 )
 
 // peelAPIFlags pulls --url/--host/--token from anywhere in args so they work

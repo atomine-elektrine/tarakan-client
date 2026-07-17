@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	"tarakan-client/internal/api"
-	"tarakan-client/internal/reviewdoc"
+	"github.com/atomine-elektrine/tarakan-client/internal/api"
+	"github.com/atomine-elektrine/tarakan-client/internal/reviewdoc"
 )
 
 var errNoRepo = errors.New("the current directory has no git remote origin (owner/name)")

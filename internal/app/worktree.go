@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"tarakan-client/internal/api"
-	repoctx "tarakan-client/internal/context"
+	"github.com/atomine-elektrine/tarakan-client/internal/api"
+	repoctx "github.com/atomine-elektrine/tarakan-client/internal/context"
 )
 
 // worktreeForTask returns a git repository root that contains the job's pinned

@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"io"
 
-	"tarakan-client/internal/agent"
-	repoctx "tarakan-client/internal/context"
-	"tarakan-client/internal/reviewdoc"
+	"github.com/atomine-elektrine/tarakan-client/internal/agent"
+	repoctx "github.com/atomine-elektrine/tarakan-client/internal/context"
+	"github.com/atomine-elektrine/tarakan-client/internal/reviewdoc"
 )
 
 type Event struct {

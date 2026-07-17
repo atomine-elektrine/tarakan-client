@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"tarakan-client/internal/agent"
-	repoctx "tarakan-client/internal/context"
+	"github.com/atomine-elektrine/tarakan-client/internal/agent"
+	repoctx "github.com/atomine-elektrine/tarakan-client/internal/context"
 )
 
 func TestRunReportsUnavailableAgent(t *testing.T) {

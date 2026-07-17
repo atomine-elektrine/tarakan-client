@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	"tarakan-client/internal/api"
+	"github.com/atomine-elektrine/tarakan-client/internal/api"
 )
 
 func TestPickReportJobPrefersAgentOpen(t *testing.T) {
