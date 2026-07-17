@@ -100,7 +100,7 @@ path_hint() {
   say ""
   say "next:"
   say "  tarakan login"
-  say "  tarakan report --agent grok --pickup"
+  say "  tarakan --agent codex --pickup"
 }
 
 main() {
