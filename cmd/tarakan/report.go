@@ -42,7 +42,7 @@ func runReport(ctx context.Context, arguments []string, stdin io.Reader, stdout,
 		hostFlag      string
 		tokenFlag     string
 	)
-	flags.StringVar(&agentName, "agent", "", "local agent: claude, codex, or grok (required unless --document-file)")
+	flags.StringVar(&agentName, "agent", "", "local agent: claude, codex, grok, or kimi (required unless --document-file)")
 	flags.StringVar(&model, "model", "", "model label stored on the report (defaults to --agent)")
 	flags.Int64Var(&jobID, "job", 0, "optional Job/Request ID to claim and complete")
 	flags.StringVar(&documentFile, "document-file", "", "publish an existing Review Format JSON file (skip agent run)")
@@ -50,12 +50,18 @@ func runReport(ctx context.Context, arguments []string, stdin io.Reader, stdout,
 	flags.StringVar(&promptVersion, "prompt-version", "tarakan-report/v2", "prompt version label")
 	flags.StringVar(&outputFile, "output", "", "also write findings JSON to this path")
 	var pickup bool
+	var minStars int
+	var languageFilter string
 	flags.BoolVar(&yes, "yes", false, "publish without an interactive confirmation prompt")
 	flags.BoolVar(&interactive, "interactive", false, "open the TUI (with --job, or next open job if omitted)")
 	flags.BoolVar(&pickup, "pickup", false, "open the TUI, claim next open job from the global queue, run agent")
+	flags.IntVar(&minStars, "min-stars", 0, "only pick up jobs on repos with at least this many stars")
+	flags.StringVar(&languageFilter, "language", "", "only pick up jobs on repos with this primary language")
+	flags.StringVar(&languageFilter, "lang", "", "alias for --language")
 	addAPIFlags(flags, &urlFlag, &hostFlag, &tokenFlag)
 	flags.Usage = func() {
 		fmt.Fprintln(stderr, "Usage: tarakan report --token TOKEN --agent grok --pickup")
+		fmt.Fprintln(stderr, "       tarakan report --agent grok --pickup --min-stars 500 --language Rust")
 		fmt.Fprintln(stderr, "       tarakan report [--url URL] [--token TOKEN] [--agent …] [--job ID] [--yes]")
 		fmt.Fprintln(stderr, "       tarakan report --document-file findings.json [--job ID] [--yes]")
 		fmt.Fprintln(stderr, "")
@@ -94,7 +100,10 @@ func runReport(ctx context.Context, arguments []string, stdin io.Reader, stdout,
 		if interactive && jobID > 0 {
 			autoPickup = false
 		}
-		return runInteractiveJob(agentName, model, jobID, autoPickup, cfg, stderr)
+		return runInteractiveJob(agentName, model, jobID, autoPickup, cfg, api.QueueFilter{
+			MinStars: minStars,
+			Language: languageFilter,
+		}, stderr)
 	}
 
 	client, err := cfg.Client()
@@ -526,6 +535,121 @@ func runCheck(ctx context.Context, arguments []string, stdin io.Reader, stdout, 
 	}
 	fmt.Fprintf(stderr, "Recorded Check on Report #%d (verdict=%s).\n", reportID, verdict)
 	return writeJSON(stdout, stderr, scan)
+}
+
+// runCheckFinding records an independent check on one canonical finding UUID.
+//
+//	tarakan check-finding UUID --verdict confirmed|disputed|fixed --notes "…"
+func runCheckFinding(ctx context.Context, arguments []string, stdin io.Reader, stdout, stderr io.Writer, cfg api.Config) int {
+	flags := flag.NewFlagSet("check-finding", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	var verdict, notes, provenance, evidenceFile, commitSHA string
+	var urlFlag, hostFlag, tokenFlag string
+	flags.StringVar(&verdict, "verdict", "", "confirmed, disputed, or fixed (required)")
+	flags.StringVar(&notes, "notes", "", "rationale, ≥20 characters (required)")
+	flags.StringVar(&provenance, "provenance", "agent", "human, agent, or hybrid")
+	flags.StringVar(&evidenceFile, "evidence-file", "", "optional PoC / evidence file")
+	flags.StringVar(&commitSHA, "commit", "", "full commit SHA (defaults to git HEAD)")
+	addAPIFlags(flags, &urlFlag, &hostFlag, &tokenFlag)
+	flags.Usage = func() {
+		fmt.Fprintln(stderr, "Usage: tarakan check-finding FINDING_UUID --verdict confirmed|disputed|fixed --notes TEXT")
+		fmt.Fprintln(stderr, "")
+		fmt.Fprintln(stderr, "Independently check one canonical finding (matches the web Checks form).")
+		flags.PrintDefaults()
+	}
+	var leadingID string
+	if len(arguments) > 0 && !strings.HasPrefix(arguments[0], "-") {
+		leadingID = arguments[0]
+		arguments = arguments[1:]
+	}
+	if err := flags.Parse(arguments); err != nil {
+		return 2
+	}
+	positionals := flags.Args()
+	if leadingID != "" {
+		positionals = append([]string{leadingID}, positionals...)
+	}
+	if len(positionals) != 1 {
+		flags.Usage()
+		return 2
+	}
+	findingID := strings.TrimSpace(positionals[0])
+	if findingID == "" {
+		fmt.Fprintln(stderr, "FINDING_UUID is required")
+		return 2
+	}
+	verdict = strings.ToLower(strings.TrimSpace(verdict))
+	if verdict != "confirmed" && verdict != "disputed" && verdict != "fixed" {
+		fmt.Fprintln(stderr, "--verdict must be confirmed, disputed, or fixed")
+		return 2
+	}
+	notes = strings.TrimSpace(notes)
+	if utf8.RuneCountInString(notes) < 20 {
+		fmt.Fprintln(stderr, "--notes must be at least 20 characters")
+		return 2
+	}
+	provenance = strings.ToLower(strings.TrimSpace(provenance))
+	if provenance != "human" && provenance != "agent" && provenance != "hybrid" {
+		fmt.Fprintln(stderr, "--provenance must be human, agent, or hybrid")
+		return 2
+	}
+
+	var evidence string
+	var err error
+	if evidenceFile != "" {
+		evidence, err = readEvidence(evidenceFile, stdin)
+		if err != nil {
+			fmt.Fprintf(stderr, "read evidence: %v\n", err)
+			return 1
+		}
+	}
+
+	cfg, err = mergeFlagConfig(cfg, urlFlag, hostFlag, tokenFlag)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 2
+	}
+	client, err := cfg.Client()
+	if err != nil {
+		return printAPIConfigurationError(stderr, err)
+	}
+
+	repository, err := repoctx.Current()
+	if err != nil {
+		fmt.Fprintf(stderr, "discover repository: %v\n", err)
+		return 1
+	}
+	owner, name, ok := repository.RemoteSlug()
+	if !ok {
+		owner, name = repository.GitHubOwner, repository.GitHubName
+		ok = owner != "" && name != ""
+	}
+	if !ok {
+		fmt.Fprintln(stderr, "current directory has no git remote origin (owner/name)")
+		return 1
+	}
+	commitSHA = strings.ToLower(strings.TrimSpace(commitSHA))
+	if commitSHA == "" {
+		commitSHA = strings.ToLower(strings.TrimSpace(repository.CommitSHA))
+	}
+	if len(commitSHA) != 40 {
+		fmt.Fprintln(stderr, "need a full 40-char commit SHA (--commit or git HEAD)")
+		return 2
+	}
+
+	err = client.SubmitFindingVerdictForHost(ctx, repository.Host, owner, name, findingID, api.FindingVerdict{
+		CommitSHA:  commitSHA,
+		Verdict:    verdict,
+		Provenance: provenance,
+		Notes:      notes,
+		Evidence:   evidence,
+	})
+	if err != nil {
+		fmt.Fprintf(stderr, "check finding: %v\n", err)
+		return 1
+	}
+	fmt.Fprintf(stderr, "Recorded check on finding %s (verdict=%s) at %s.\n", findingID, verdict, shortSHA(commitSHA))
+	return 0
 }
 
 func shortSHA(sha string) string {

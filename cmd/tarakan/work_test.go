@@ -16,13 +16,13 @@ import (
 
 func TestJobsCommandUsesConfiguredAPI(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
-		if request.URL.Path != "/api/github/openai/codex/requests" {
+		if request.URL.Path != "/api/github.com/openai/codex/jobs" {
 			t.Fatalf("path = %q", request.URL.Path)
 		}
 		if request.Header.Get("Authorization") != "Bearer command-token" {
 			t.Fatal("missing bearer token")
 		}
-		_, _ = response.Write([]byte(`{"tasks":[{"id":23,"title":"Review auth","repository":{"host":"github","owner":"openai","name":"codex"}}]}`))
+		_, _ = response.Write([]byte(`{"jobs":[{"id":23,"title":"Review auth","repository":{"host":"github","owner":"openai","name":"codex"}}]}`))
 	}))
 	defer server.Close()
 	t.Setenv("TARAKAN_URL", server.URL)
@@ -34,19 +34,19 @@ func TestJobsCommandUsesConfiguredAPI(t *testing.T) {
 		t.Fatalf("exit = %d, stderr = %s", code, stderr.String())
 	}
 	var result struct {
-		Tasks []api.Task `json:"tasks"`
+		Jobs []api.Task `json:"jobs"`
 	}
 	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
 		t.Fatal(err)
 	}
-	if len(result.Tasks) != 1 || result.Tasks[0].ID != 23 {
+	if len(result.Jobs) != 1 || result.Jobs[0].ID != 23 {
 		t.Fatalf("output = %s", stdout.String())
 	}
 }
 
 func TestSubmitCommandAcceptsFlagsAfterIDAndEvidenceFromStdin(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
-		if request.Method != http.MethodPost || request.URL.Path != "/api/requests/17/complete" {
+		if request.Method != http.MethodPost || request.URL.Path != "/api/jobs/17/complete" {
 			t.Fatalf("request = %s %s", request.Method, request.URL.Path)
 		}
 		var completion api.Completion
@@ -78,9 +78,9 @@ func TestCheckCommandAcceptsFlagsAfterReportID(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		response.Header().Set("Content-Type", "application/json")
 		switch {
-		case request.Method == http.MethodPost && request.URL.Path == "/api/requests/7/claim":
+		case request.Method == http.MethodPost && request.URL.Path == "/api/jobs/7/claim":
 			_, _ = response.Write([]byte(`{"id":7,"status":"claimed"}`))
-		case request.Method == http.MethodPost && request.URL.Path == "/api/requests/7/complete":
+		case request.Method == http.MethodPost && request.URL.Path == "/api/jobs/7/complete":
 			var submission api.Submission
 			if err := json.NewDecoder(request.Body).Decode(&submission); err != nil {
 				t.Fatal(err)

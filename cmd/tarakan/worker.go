@@ -25,6 +25,8 @@ func runWorker(ctx context.Context, arguments []string, stdout, stderr io.Writer
 	var jobsOnly bool
 	var skipCritic bool
 	var urlFlag, hostFlag, tokenFlag string
+	var minStars int
+	var language, kind string
 	flags.StringVar(&agentName, "agent", "", "local review backend (required)")
 	flags.StringVar(&model, "model", "", "override the model for HTTP backends")
 	flags.BoolVar(&once, "once", false, "process the current queue once and exit")
@@ -33,9 +35,13 @@ func runWorker(ctx context.Context, arguments []string, stdout, stderr io.Writer
 	flags.BoolVar(&jobsOnly, "jobs-only", false, "process explicit Jobs only; skip the unscanned repository queue")
 	flags.BoolVar(&skipCritic, "skip-critic", false, "skip the second evidence-validation agent pass")
 	flags.StringVar(&statePath, "state-file", "", "durable worker state path")
+	flags.IntVar(&minStars, "min-stars", 0, "only repos/jobs with at least this many stars")
+	flags.StringVar(&language, "language", "", "only repos with this primary language (e.g. Rust, Elixir)")
+	flags.StringVar(&language, "lang", "", "alias for --language")
+	flags.StringVar(&kind, "kind", "", "only jobs of this kind (e.g. code_review, verify_findings)")
 	addAPIFlags(flags, &urlFlag, &hostFlag, &tokenFlag)
 	flags.Usage = func() {
-		fmt.Fprintln(stderr, "Usage: tarakan worker --agent codex [--once] [--interval 30s]")
+		fmt.Fprintln(stderr, "Usage: tarakan worker --agent codex [--once] [--min-stars N] [--language Rust]")
 		fmt.Fprintln(stderr, "Continuously completes agent Jobs against pinned snapshots: Reports, Checks, and patch proposals.")
 		flags.PrintDefaults()
 	}
@@ -72,6 +78,11 @@ func runWorker(ctx context.Context, arguments []string, stdout, stderr io.Writer
 		ReviewUnscanned: !jobsOnly,
 		SkipCritic:      skipCritic,
 		StatePath:       statePath,
+		Filter: api.QueueFilter{
+			MinStars: minStars,
+			Language: language,
+			Kind:     kind,
+		},
 		Progress: func(message string) {
 			fmt.Fprintln(stdout, time.Now().Format(time.RFC3339), message)
 		},

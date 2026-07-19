@@ -39,7 +39,7 @@ func taskMatchesOrigin(task api.Task, owner, name string) bool {
 // Only agent-capability jobs are safe to automate. Human and hybrid Jobs
 // require participation the client cannot honestly claim in provenance.
 func pickReportJob(tasks []api.Task) (api.Task, bool) {
-	return pickReportJobPreferring(tasks, "", "")
+	return pickReportJobPreferring(tasks, "", "", api.QueueFilter{})
 }
 
 // pickReportJobPreferring order:
@@ -47,7 +47,7 @@ func pickReportJob(tasks []api.Task) (api.Task, bool) {
 //  2. Your active claims anywhere
 //  3. Open jobs on the local repo (agent > hybrid > human)
 //  4. Open jobs anywhere
-func pickReportJobPreferring(tasks []api.Task, localOwner, localName string) (api.Task, bool) {
+func pickReportJobPreferring(tasks []api.Task, localOwner, localName string, filter api.QueueFilter) (api.Task, bool) {
 	var pickable []api.Task
 	for _, task := range tasks {
 		if !reviewdoc.FindingKinds[task.Kind] {
@@ -57,6 +57,9 @@ func pickReportJobPreferring(tasks []api.Task, localOwner, localName string) (ap
 			continue
 		}
 		if !isPickable(task) {
+			continue
+		}
+		if !MatchesQueueFilter(task, filter) {
 			continue
 		}
 		pickable = append(pickable, task)

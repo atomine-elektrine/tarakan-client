@@ -19,6 +19,9 @@ const (
 	defaultOllamaModel     = "llama3.1"
 	openRouterBaseURL      = "https://openrouter.ai/api/v1"
 	defaultOpenRouterModel = "openai/gpt-4o-mini"
+	// Moonshot / Kimi OpenAI-compatible API (used when the kimi CLI is absent).
+	moonshotBaseURL      = "https://api.moonshot.ai/v1"
+	defaultMoonshotModel = "kimi-k2.5"
 
 	// A single repository bundle is bounded so it stays within a model's
 	// context window and a review call stays affordable.
@@ -53,6 +56,22 @@ func detectHTTPProviders(env getenv) []Provider {
 			BaseURL:     openRouterBaseURL,
 			Model:       firstNonEmpty(env("OPENROUTER_MODEL"), defaultOpenRouterModel),
 			APIKeyEnv:   "OPENROUTER_API_KEY",
+		})
+	}
+
+	// Prefer the kimi CLI when installed; fall back to the Moonshot HTTP API.
+	if env("MOONSHOT_API_KEY") != "" || env("KIMI_API_KEY") != "" {
+		apiKeyEnv := "MOONSHOT_API_KEY"
+		if env("MOONSHOT_API_KEY") == "" {
+			apiKeyEnv = "KIMI_API_KEY"
+		}
+		providers = append(providers, Provider{
+			Name:        "kimi-http",
+			Kind:        KindHTTP,
+			Description: "Kimi (Moonshot API)",
+			BaseURL:     strings.TrimRight(firstNonEmpty(env("MOONSHOT_BASE_URL"), moonshotBaseURL), "/"),
+			Model:       firstNonEmpty(env("MOONSHOT_MODEL"), env("KIMI_MODEL"), defaultMoonshotModel),
+			APIKeyEnv:   apiKeyEnv,
 		})
 	}
 

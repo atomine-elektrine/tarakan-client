@@ -98,23 +98,34 @@ func (c *Client) BaseURL() string {
 
 func (c *Client) ListTasks(ctx context.Context, owner, name string) ([]Task, error) {
 	var response struct {
+		Jobs  []Task `json:"jobs"`
 		Tasks []Task `json:"tasks"`
 	}
-	path := "/api/github/" + url.PathEscape(owner) + "/" + url.PathEscape(name) + "/requests"
+	path := "/api/github.com/" + url.PathEscape(owner) + "/" + url.PathEscape(name) + "/jobs"
 	if err := c.do(ctx, http.MethodGet, path, nil, &response); err != nil {
 		return nil, err
+	}
+	if len(response.Jobs) > 0 {
+		return response.Jobs, nil
 	}
 	return response.Tasks, nil
 }
 
 // ListOpenJobs returns claimable Jobs from the global queue (all listed repos).
-func (c *Client) ListOpenJobs(ctx context.Context) ([]Task, error) {
+// Optional filter may narrow by min stars, primary language, or job kind.
+func (c *Client) ListOpenJobs(ctx context.Context, filter ...QueueFilter) ([]Task, error) {
+	path := "/api/jobs"
+	if len(filter) > 0 {
+		if q := filter[0].Query().Encode(); q != "" {
+			path += "?" + q
+		}
+	}
 	var response struct {
 		Jobs     []Task `json:"jobs"`
 		Tasks    []Task `json:"tasks"`
 		Requests []Task `json:"requests"`
 	}
-	if err := c.do(ctx, http.MethodGet, "/api/requests", nil, &response); err != nil {
+	if err := c.do(ctx, http.MethodGet, path, nil, &response); err != nil {
 		return nil, err
 	}
 	switch {
@@ -155,11 +166,23 @@ func (c *Client) CompleteTask(ctx context.Context, id int64, completion Completi
 }
 
 // ListReviewableRepositories returns the review queue. status may be empty or
-// one of "unscanned"/"findings"/"reviewed"/"clear".
-func (c *Client) ListReviewableRepositories(ctx context.Context, status string) ([]QueueRepository, error) {
-	path := "/api/repositories"
+// one of "unscanned"/"findings"/"reviewed"/"clear". Optional filter narrows by
+// min stars and primary language.
+func (c *Client) ListReviewableRepositories(ctx context.Context, status string, filter ...QueueFilter) ([]QueueRepository, error) {
+	values := url.Values{}
 	if status != "" {
-		path += "?status=" + url.QueryEscape(status)
+		values.Set("status", status)
+	}
+	if len(filter) > 0 {
+		for key, vals := range filter[0].Query() {
+			for _, v := range vals {
+				values.Set(key, v)
+			}
+		}
+	}
+	path := "/api/repositories"
+	if encoded := values.Encode(); encoded != "" {
+		path += "?" + encoded
 	}
 	var response struct {
 		Repositories []QueueRepository `json:"repositories"`
@@ -350,7 +373,7 @@ func formatValidationErrors(errorsByField map[string][]string) string {
 }
 
 func taskPath(id int64) string {
-	return "/api/requests/" + strconv.FormatInt(id, 10)
+	return "/api/jobs/" + strconv.FormatInt(id, 10)
 }
 
 func scanBasePath(owner, name string) string {

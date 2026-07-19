@@ -1,5 +1,11 @@
 package api
 
+import (
+	"net/url"
+	"strconv"
+	"strings"
+)
+
 // Repository is the canonical repository identity returned by Tarakan. Client
 // code must compare this identity with the local origin before running a task.
 type Repository struct {
@@ -10,6 +16,8 @@ type Repository struct {
 	FullName          string `json:"full_name,omitempty"`
 	CanonicalURL      string `json:"canonical_url,omitempty"`
 	ParticipationMode string `json:"participation_mode,omitempty"`
+	PrimaryLanguage   string `json:"primary_language,omitempty"`
+	StarsCount        int64  `json:"stars_count,omitempty"`
 	RecordURL         string `json:"record_url,omitempty"`
 }
 
@@ -131,10 +139,36 @@ type QueueRepository struct {
 	Status          string `json:"status"`
 	DefaultBranch   string `json:"default_branch,omitempty"`
 	PrimaryLanguage string `json:"primary_language,omitempty"`
+	StarsCount      int64  `json:"stars_count,omitempty"`
 	ScanCount       int64  `json:"scan_count"`
 	LastScannedAt   string `json:"last_scanned_at,omitempty"`
 	RegisteredAt    string `json:"registered_at,omitempty"`
 	RecordURL       string `json:"record_url,omitempty"`
+}
+
+// QueueFilter narrows jobs and repository discovery (stars, language, kind).
+type QueueFilter struct {
+	MinStars int
+	Language string
+	Kind     string
+}
+
+func (f QueueFilter) Empty() bool {
+	return f.MinStars <= 0 && strings.TrimSpace(f.Language) == "" && strings.TrimSpace(f.Kind) == ""
+}
+
+func (f QueueFilter) Query() url.Values {
+	values := url.Values{}
+	if f.MinStars > 0 {
+		values.Set("min_stars", strconv.FormatInt(int64(f.MinStars), 10))
+	}
+	if lang := strings.TrimSpace(f.Language); lang != "" {
+		values.Set("language", lang)
+	}
+	if kind := strings.TrimSpace(f.Kind); kind != "" {
+		values.Set("kind", kind)
+	}
+	return values
 }
 
 func (r QueueRepository) Slug() string {

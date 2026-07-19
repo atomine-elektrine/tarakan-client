@@ -29,6 +29,31 @@ func TestArguments(t *testing.T) {
 	if args, err := arguments("grok", "prompt"); err != nil || len(args) < 2 || args[0] != "-p" {
 		t.Fatalf("grok base args = %#v err=%v", args, err)
 	}
+	args, err := arguments("kimi", "prompt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	joined := strings.Join(args, " ")
+	for _, need := range []string{"--print", "--prompt", "prompt", "--yolo", "--final-message-only"} {
+		if !strings.Contains(joined, need) {
+			t.Fatalf("kimi args missing %q: %#v", need, args)
+		}
+	}
+}
+
+func TestParseKimiStreamLine(t *testing.T) {
+	ev := parseKimiStreamLine(`{"role":"assistant","content":"finding json"}`)
+	if !ev.ok || ev.final != "finding json" {
+		t.Fatalf("assistant message = %#v", ev)
+	}
+	ev = parseKimiStreamLine(`{"type":"tool_use","name":"Read"}`)
+	if !ev.ok || !strings.Contains(ev.activity, "Read") {
+		t.Fatalf("tool use = %#v", ev)
+	}
+	ev = parseKimiStreamLine(`{"choices":[{"delta":{"content":"hi"}}]}`)
+	if !ev.ok || ev.text != "hi" {
+		t.Fatalf("delta = %#v", ev)
+	}
 }
 
 func TestSecurityPromptEnforcesReadOnlyReview(t *testing.T) {

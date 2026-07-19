@@ -29,6 +29,7 @@ type WorkerOptions struct {
 	ReviewUnscanned bool
 	SkipCritic      bool
 	StatePath       string
+	Filter          api.QueueFilter
 	Progress        func(string)
 }
 
@@ -97,7 +98,7 @@ func RunWorker(ctx context.Context, opts WorkerOptions) error {
 }
 
 func runWorkerPass(ctx context.Context, client *api.Client, journal *workerJournal, opts WorkerOptions) (int, error) {
-	tasks, err := retryValue(ctx, func() ([]api.Task, error) { return client.ListOpenJobs(ctx) })
+	tasks, err := retryValue(ctx, func() ([]api.Task, error) { return client.ListOpenJobs(ctx, opts.Filter) })
 	if err != nil {
 		return 0, fmt.Errorf("load Job queue: %w", err)
 	}
@@ -108,6 +109,9 @@ func runWorkerPass(ctx context.Context, client *api.Client, journal *workerJourn
 			break
 		}
 		if !workerEligible(task) || !isPickable(task) {
+			continue
+		}
+		if !MatchesQueueFilter(task, opts.Filter) {
 			continue
 		}
 		key := workerJobKey(task)
@@ -134,7 +138,7 @@ func runWorkerPass(ctx context.Context, client *api.Client, journal *workerJourn
 
 func runUnscannedPass(ctx context.Context, client *api.Client, journal *workerJournal, opts WorkerOptions, limit int) (int, error) {
 	repositories, err := retryValue(ctx, func() ([]api.QueueRepository, error) {
-		return client.ListReviewableRepositories(ctx, "unscanned")
+		return client.ListReviewableRepositories(ctx, "unscanned", opts.Filter)
 	})
 	if err != nil {
 		return 0, fmt.Errorf("load unscanned queue: %w", err)
@@ -144,6 +148,9 @@ func runUnscannedPass(ctx context.Context, client *api.Client, journal *workerJo
 	for _, repository := range repositories {
 		if processed >= limit {
 			break
+		}
+		if !MatchesRepositoryFilter(repository, opts.Filter) {
+			continue
 		}
 		root, cleanup, err := cloneQueueRepository(repository, client.BaseURL(), opts.Progress)
 		if err != nil {
@@ -174,6 +181,14 @@ func runUnscannedPass(ctx context.Context, client *api.Client, journal *workerJo
 		if runErr == nil {
 			var doc api.ScanDocument
 			doc, runErr = reviewdoc.Parse(output)
+			// One retry when the stream truncates or returns non-JSON noise.
+			if runErr != nil {
+				opts.Progress("Parse failed (" + runErr.Error() + "); retrying agent once")
+				output, runErr = runAgentInSnapshotContext(ctx, root, info.CommitSHA, opts.Provider, reviewdoc.FormatPrompt, opts.Progress)
+				if runErr == nil {
+					doc, runErr = reviewdoc.Parse(output)
+				}
+			}
 			if runErr == nil && !opts.SkipCritic {
 				doc, runErr = criticDocument(ctx, root, info.CommitSHA, opts.Provider, doc, opts.Progress)
 			}

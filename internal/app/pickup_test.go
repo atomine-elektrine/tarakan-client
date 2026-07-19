@@ -44,7 +44,7 @@ func TestPickReportJobPrefersMyActiveClaim(t *testing.T) {
 		{ID: 1, Kind: "code_review", Status: "open", Capability: "agent", Repository: api.Repository{Owner: "a", Name: "b"}},
 		{ID: 2, Kind: "code_review", Status: "claimed", Capability: "agent", Lease: &api.Lease{Active: true}, Repository: api.Repository{Owner: "a", Name: "b"}},
 	}
-	got, ok := pickReportJobPreferring(tasks, "a", "b")
+	got, ok := pickReportJobPreferring(tasks, "a", "b", api.QueueFilter{})
 	if !ok || got.ID != 2 {
 		t.Fatalf("got %#v ok=%v, want active claim #2 over open #1", got, ok)
 	}
@@ -64,13 +64,27 @@ func TestPickReportJobPreferringLocalOrigin(t *testing.T) {
 		{ID: 1, Kind: "code_review", Status: "open", Capability: "agent", Repository: api.Repository{Owner: "other", Name: "repo"}},
 		{ID: 2, Kind: "code_review", Status: "open", Capability: "agent", Repository: api.Repository{Owner: "acme", Name: "app"}},
 	}
-	got, ok := pickReportJobPreferring(tasks, "acme", "app")
+	got, ok := pickReportJobPreferring(tasks, "acme", "app", api.QueueFilter{})
 	if !ok || got.ID != 2 {
 		t.Fatalf("got %#v ok=%v, want local job #2", got, ok)
 	}
 	// No local match → take global preferred (agent first).
-	got, ok = pickReportJobPreferring(tasks, "missing", "repo")
+	got, ok = pickReportJobPreferring(tasks, "missing", "repo", api.QueueFilter{})
 	if !ok || got.ID != 1 {
 		t.Fatalf("got %#v ok=%v, want global agent job #1", got, ok)
+	}
+}
+
+func TestPickReportJobRespectsLanguageAndStars(t *testing.T) {
+	tasks := []api.Task{
+		{ID: 1, Kind: "code_review", Status: "open", Capability: "agent", Repository: api.Repository{Owner: "a", Name: "rust", PrimaryLanguage: "Rust", StarsCount: 50}},
+		{ID: 2, Kind: "code_review", Status: "open", Capability: "agent", Repository: api.Repository{Owner: "a", Name: "elixir", PrimaryLanguage: "Elixir", StarsCount: 5000}},
+	}
+	got, ok := pickReportJobPreferring(tasks, "", "", api.QueueFilter{Language: "Elixir", MinStars: 1000})
+	if !ok || got.ID != 2 {
+		t.Fatalf("got %#v ok=%v, want Elixir high-star job #2", got, ok)
+	}
+	if _, ok := pickReportJobPreferring(tasks, "", "", api.QueueFilter{Language: "Go"}); ok {
+		t.Fatal("expected no Go jobs")
 	}
 }

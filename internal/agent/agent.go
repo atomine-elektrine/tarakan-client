@@ -59,6 +59,7 @@ func Detect() Registry {
 		{Name: "claude", Kind: KindCLI, Command: "claude", Description: "Claude Code"},
 		{Name: "codex", Kind: KindCLI, Command: "codex", Description: "OpenAI Codex"},
 		{Name: "grok", Kind: KindCLI, Command: "grok", Description: "Grok Build"},
+		{Name: "kimi", Kind: KindCLI, Command: "kimi", Description: "Kimi Code"},
 	}
 
 	available := make([]Provider, 0, len(known)+2)
@@ -78,9 +79,18 @@ func (r Registry) Providers() []Provider {
 }
 
 func (r Registry) Find(name string) (Provider, bool) {
+	name = strings.ToLower(strings.TrimSpace(name))
 	for _, provider := range r.providers {
-		if provider.Name == strings.ToLower(name) {
+		if provider.Name == name {
 			return provider, true
+		}
+	}
+	// --agent kimi prefers the CLI; fall back to Moonshot HTTP when only the API key is set.
+	if name == "kimi" {
+		for _, provider := range r.providers {
+			if provider.Name == "kimi-http" {
+				return provider, true
+			}
 		}
 	}
 	return Provider{}, false
@@ -128,7 +138,7 @@ func runCLI(ctx context.Context, provider Provider, request Request) (string, er
 	}
 
 	// CLI agents that expose structured event streams get live tool activity
-	// in Progress (same transcript UX for grok / claude / codex).
+	// in Progress (same transcript UX for grok / claude / codex / kimi).
 	switch provider.Name {
 	case "grok":
 		return runGrok(ctx, provider, request)
@@ -136,6 +146,8 @@ func runCLI(ctx context.Context, provider Provider, request Request) (string, er
 		return runClaude(ctx, provider, request)
 	case "codex":
 		return runCodex(ctx, provider, request)
+	case "kimi":
+		return runKimi(ctx, provider, request)
 	}
 
 	args, err := arguments(provider.Name, securityPrompt(request.Prompt))
@@ -241,6 +253,14 @@ func arguments(provider, prompt string) ([]string, error) {
 		return []string{"exec", prompt}, nil
 	case "grok":
 		return []string{"-p", prompt}, nil
+	case "kimi":
+		// Print mode: non-interactive, auto-approves tools for this invocation.
+		return []string{
+			"--print",
+			"--prompt", prompt,
+			"--yolo",
+			"--final-message-only",
+		}, nil
 	default:
 		return nil, fmt.Errorf("unknown agent provider %q", provider)
 	}

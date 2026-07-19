@@ -14,7 +14,7 @@ const testToken = "test-secret-that-must-never-be-logged"
 
 func TestListOpenJobsUsesGlobalQueueRoute(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
-		if request.Method != http.MethodGet || request.URL.Path != "/api/requests" {
+		if request.Method != http.MethodGet || request.URL.Path != "/api/jobs" {
 			t.Fatalf("unexpected request %s %s", request.Method, request.URL.Path)
 		}
 		if got := request.Header.Get("Authorization"); got != "Bearer secret-token" {
@@ -36,14 +36,14 @@ func TestListOpenJobsUsesGlobalQueueRoute(t *testing.T) {
 
 func TestListTasksUsesRepositoryRouteAndBearerToken(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
-		if request.Method != http.MethodGet || request.URL.Path != "/api/github/openai/codex/requests" {
+		if request.Method != http.MethodGet || request.URL.Path != "/api/github.com/openai/codex/jobs" {
 			t.Fatalf("request = %s %s", request.Method, request.URL.Path)
 		}
 		if got := request.Header.Get("Authorization"); got != "Bearer "+testToken {
 			t.Fatalf("authorization header = %q", got)
 		}
 		response.Header().Set("Content-Type", "application/json")
-		_, _ = response.Write([]byte(`{"tasks":[{"id":7,"repository":{"owner":"openai","name":"codex"},"commit_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","capability":"agent","status":"open"}]}`))
+		_, _ = response.Write([]byte(`{"jobs":[{"id":7,"repository":{"owner":"openai","name":"codex"},"commit_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","capability":"agent","status":"open"}]}`))
 	}))
 	defer server.Close()
 
@@ -68,11 +68,11 @@ func TestTaskMutationsMatchContract(t *testing.T) {
 		call   func(*Client) (Task, error)
 		body   map[string]string
 	}{
-		{name: "show", method: http.MethodGet, path: "/api/requests/9", call: func(client *Client) (Task, error) { return client.GetTask(context.Background(), 9) }},
-		{name: "claim", method: http.MethodPost, path: "/api/requests/9/claim", call: func(client *Client) (Task, error) { return client.ClaimTask(context.Background(), 9) }},
-		{name: "release", method: http.MethodDelete, path: "/api/requests/9/claim", call: func(client *Client) (Task, error) { return client.ReleaseTask(context.Background(), 9) }},
-		{name: "renew", method: http.MethodPost, path: "/api/requests/9/claim/renew", call: func(client *Client) (Task, error) { return client.RenewTaskClaim(context.Background(), 9) }},
-		{name: "submit", method: http.MethodPost, path: "/api/requests/9/complete", body: map[string]string{"provenance": "human", "summary": "confirmed", "evidence": "test output"}, call: func(client *Client) (Task, error) {
+		{name: "show", method: http.MethodGet, path: "/api/jobs/9", call: func(client *Client) (Task, error) { return client.GetTask(context.Background(), 9) }},
+		{name: "claim", method: http.MethodPost, path: "/api/jobs/9/claim", call: func(client *Client) (Task, error) { return client.ClaimTask(context.Background(), 9) }},
+		{name: "release", method: http.MethodDelete, path: "/api/jobs/9/claim", call: func(client *Client) (Task, error) { return client.ReleaseTask(context.Background(), 9) }},
+		{name: "renew", method: http.MethodPost, path: "/api/jobs/9/claim/renew", call: func(client *Client) (Task, error) { return client.RenewTaskClaim(context.Background(), 9) }},
+		{name: "submit", method: http.MethodPost, path: "/api/jobs/9/complete", body: map[string]string{"provenance": "human", "summary": "confirmed", "evidence": "test output"}, call: func(client *Client) (Task, error) {
 			return client.SubmitTask(context.Background(), 9, Submission{Provenance: "human", Summary: "confirmed", Evidence: "test output"})
 		}},
 	}

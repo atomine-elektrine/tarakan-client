@@ -475,14 +475,15 @@ func (m Model) runRunTask(id int64) func(report func(string)) tea.Msg {
 
 func (m Model) runPickupJob() func(report func(string)) tea.Msg {
 	localOwner, localName, _ := m.repoSlug()
+	filter := m.queueFilter
 	return m.withClientProgress(func(client *api.Client, report func(string)) tea.Msg {
 		report("Fetching global job queue…")
-		tasks, err := client.ListOpenJobs(context.Background())
+		tasks, err := client.ListOpenJobs(context.Background(), filter)
 		if err != nil {
 			return pickedJobMsg{err: fmt.Errorf("global job queue: %w", err)}
 		}
 		report(fmt.Sprintf("Queue returned %d job(s); picking a report job…", len(tasks)))
-		task, found := pickReportJobPreferring(tasks, localOwner, localName)
+		task, found := pickReportJobPreferring(tasks, localOwner, localName, filter)
 		if !found {
 			return pickedJobMsg{empty: true}
 		}

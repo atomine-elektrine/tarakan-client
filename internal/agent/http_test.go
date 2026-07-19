@@ -31,10 +31,12 @@ func TestDetectHTTPProvidersFromEnv(t *testing.T) {
 		"OLLAMA_HOST":        "http://127.0.0.1:11434",
 		"OPENROUTER_API_KEY": "sk-or-test",
 		"OPENROUTER_MODEL":   "anthropic/claude-3.5-sonnet",
+		"MOONSHOT_API_KEY":   "sk-ms-test",
+		"MOONSHOT_MODEL":     "kimi-k2.5",
 	}))
 
-	if len(providers) != 2 {
-		t.Fatalf("expected ollama + openrouter, got %#v", providers)
+	if len(providers) != 3 {
+		t.Fatalf("expected ollama + openrouter + kimi-http, got %#v", providers)
 	}
 
 	ollama := providers[0]
@@ -54,6 +56,14 @@ func TestDetectHTTPProvidersFromEnv(t *testing.T) {
 	}
 	if openrouter.BaseURL != openRouterBaseURL || openrouter.Model != "anthropic/claude-3.5-sonnet" {
 		t.Fatalf("openrouter config = %#v", openrouter)
+	}
+
+	kimiHTTP := providers[2]
+	if kimiHTTP.Name != "kimi-http" || kimiHTTP.APIKeyEnv != "MOONSHOT_API_KEY" {
+		t.Fatalf("unexpected kimi-http provider: %#v", kimiHTTP)
+	}
+	if kimiHTTP.BaseURL != moonshotBaseURL || kimiHTTP.Model != "kimi-k2.5" {
+		t.Fatalf("kimi-http config = %#v", kimiHTTP)
 	}
 }
 

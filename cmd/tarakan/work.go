@@ -17,6 +17,7 @@ import (
 
 	"github.com/atomine-elektrine/tarakan-client/internal/agent"
 	"github.com/atomine-elektrine/tarakan-client/internal/api"
+	"github.com/atomine-elektrine/tarakan-client/internal/app"
 	repoctx "github.com/atomine-elektrine/tarakan-client/internal/context"
 	"github.com/atomine-elektrine/tarakan-client/internal/reviewdoc"
 	"github.com/atomine-elektrine/tarakan-client/internal/snapshot"
@@ -76,10 +77,18 @@ func runJobs(ctx context.Context, arguments []string, stdout, stderr io.Writer, 
 	flags.SetOutput(stderr)
 	var repositoryFlag string
 	var urlFlag, hostFlag, tokenFlag string
+	var minStars int
+	var language, kind string
+	var global bool
 	flags.StringVar(&repositoryFlag, "repo", "", "GitHub repository as owner/name (defaults to the current origin)")
+	flags.BoolVar(&global, "global", false, "list the global open queue (all listed repos)")
+	flags.IntVar(&minStars, "min-stars", 0, "only jobs on repos with at least this many stars")
+	flags.StringVar(&language, "language", "", "only jobs on repos with this primary language")
+	flags.StringVar(&language, "lang", "", "alias for --language")
+	flags.StringVar(&kind, "kind", "", "only jobs of this kind")
 	addAPIFlags(flags, &urlFlag, &hostFlag, &tokenFlag)
 	flags.Usage = func() {
-		fmt.Fprintln(stderr, "Usage: tarakan jobs [--repo owner/name] [--url URL] [--token TOKEN]")
+		fmt.Fprintln(stderr, "Usage: tarakan jobs [--repo owner/name] [--global] [--min-stars N] [--language Rust]")
 		flags.PrintDefaults()
 	}
 	if err := flags.Parse(arguments); err != nil {
@@ -94,22 +103,49 @@ func runJobs(ctx context.Context, arguments []string, stdout, stderr io.Writer, 
 		fmt.Fprintln(stderr, err)
 		return 2
 	}
+	client, err := cfg.Client()
+	if err != nil {
+		return printAPIConfigurationError(stderr, err)
+	}
+	filter := api.QueueFilter{MinStars: minStars, Language: language, Kind: kind}
+
+	// Global queue when explicitly requested or when no local/repo context.
+	if global || repositoryFlag == "" {
+		if !global {
+			if _, _, err := repositoryFromFlagOrContext(""); err != nil {
+				global = true
+			}
+		}
+	}
+	if global {
+		tasks, err := client.ListOpenJobs(ctx, filter)
+		if err != nil {
+			fmt.Fprintf(stderr, "list Tarakan jobs: %v\n", err)
+			return 1
+		}
+		return writeJSON(stdout, stderr, map[string]any{"jobs": tasks})
+	}
 
 	owner, name, err := repositoryFromFlagOrContext(repositoryFlag)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return 2
 	}
-	client, err := cfg.Client()
-	if err != nil {
-		return printAPIConfigurationError(stderr, err)
-	}
 	tasks, err := client.ListTasks(ctx, owner, name)
 	if err != nil {
 		fmt.Fprintf(stderr, "list Tarakan jobs: %v\n", err)
 		return 1
 	}
-	return writeJSON(stdout, stderr, map[string]any{"tasks": tasks})
+	if !filter.Empty() {
+		filtered := make([]api.Task, 0, len(tasks))
+		for _, task := range tasks {
+			if app.MatchesQueueFilter(task, filter) {
+				filtered = append(filtered, task)
+			}
+		}
+		tasks = filtered
+	}
+	return writeJSON(stdout, stderr, map[string]any{"jobs": tasks})
 }
 
 func runTaskShow(ctx context.Context, arguments []string, stdout, stderr io.Writer, cfg api.Config) int {

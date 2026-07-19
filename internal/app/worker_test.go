@@ -30,16 +30,16 @@ func TestWorkerClaimsRunsAndSubmitsAgentJob(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
-		case r.URL.Path == "/api/requests":
+		case r.URL.Path == "/api/jobs":
 			_ = json.NewEncoder(w).Encode(map[string]any{"jobs": []api.Task{task}})
-		case r.URL.Path == "/api/requests/17" && r.Method == http.MethodGet:
+		case r.URL.Path == "/api/jobs/17" && r.Method == http.MethodGet:
 			_ = json.NewEncoder(w).Encode(task)
-		case r.URL.Path == "/api/requests/17/claim":
+		case r.URL.Path == "/api/jobs/17/claim":
 			claimed := task
 			claimed.Status = "claimed"
 			claimed.Lease = &api.Lease{Active: true}
 			_ = json.NewEncoder(w).Encode(claimed)
-		case r.URL.Path == "/api/requests/17/complete":
+		case r.URL.Path == "/api/jobs/17/complete":
 			submitted.Add(1)
 			var body api.Submission
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -114,16 +114,16 @@ func TestWorkerProducesStructuredFixArtifact(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
-		case r.URL.Path == "/api/requests":
+		case r.URL.Path == "/api/jobs":
 			_ = json.NewEncoder(w).Encode(map[string]any{"jobs": []api.Task{task}})
-		case r.URL.Path == "/api/requests/18" && r.Method == http.MethodGet:
+		case r.URL.Path == "/api/jobs/18" && r.Method == http.MethodGet:
 			_ = json.NewEncoder(w).Encode(task)
-		case r.URL.Path == "/api/requests/18/claim":
+		case r.URL.Path == "/api/jobs/18/claim":
 			claimed := task
 			claimed.Status = "claimed"
 			claimed.Lease = &api.Lease{Active: true}
 			_ = json.NewEncoder(w).Encode(claimed)
-		case r.URL.Path == "/api/requests/18/complete":
+		case r.URL.Path == "/api/jobs/18/complete":
 			submitted.Add(1)
 			var body api.Submission
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -175,16 +175,16 @@ func TestWorkerVerifiesEveryTargetFinding(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
-		case r.URL.Path == "/api/requests":
+		case r.URL.Path == "/api/jobs":
 			_ = json.NewEncoder(w).Encode(map[string]any{"jobs": []api.Task{task}})
-		case r.URL.Path == "/api/requests/19" && r.Method == http.MethodGet:
+		case r.URL.Path == "/api/jobs/19" && r.Method == http.MethodGet:
 			_ = json.NewEncoder(w).Encode(task)
-		case r.URL.Path == "/api/requests/19/claim":
+		case r.URL.Path == "/api/jobs/19/claim":
 			claimed := task
 			claimed.Status = "claimed"
 			claimed.Lease = &api.Lease{Active: true}
 			_ = json.NewEncoder(w).Encode(claimed)
-		case r.URL.Path == "/api/requests/19/complete":
+		case r.URL.Path == "/api/jobs/19/complete":
 			var body api.Submission
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 				t.Fatal(err)

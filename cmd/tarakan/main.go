@@ -23,7 +23,7 @@ import (
 )
 
 // version is the client release (override with -ldflags "-X main.version=…").
-var version = "0.2.2"
+var version = "0.2.3"
 
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
@@ -59,12 +59,18 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	var printAgents bool
 	var printVersion bool
 	var urlFlag, hostFlag, tokenFlag string
+	var minStars int
+	var language, kind string
 	flags.StringVar(&prompt, "p", "", "run one prompt in headless JSON mode")
 	flags.StringVar(&prompt, "prompt", "", "run one prompt in headless JSON mode")
 	flags.StringVar(&agentName, "agent", "", "review backend: claude, codex, grok, kimi, ollama, openrouter, or kimi-http")
 	flags.StringVar(&model, "model", "", "override the model for HTTP backends (ollama, openrouter, kimi-http)")
 	flags.Int64Var(&jobID, "job", 0, "open interactive UI, claim this job, and run the agent")
 	flags.BoolVar(&pickup, "pickup", false, "open interactive UI, claim next open job from the global queue, run agent")
+	flags.IntVar(&minStars, "min-stars", 0, "only pick up jobs/repos with at least this many stars")
+	flags.StringVar(&language, "language", "", "only pick up jobs/repos with this primary language")
+	flags.StringVar(&language, "lang", "", "alias for --language")
+	flags.StringVar(&kind, "kind", "", "only pick up jobs of this kind (e.g. code_review, verify_findings)")
 	flags.BoolVar(&printContext, "context", false, "print repository context as JSON")
 	flags.BoolVar(&printAgents, "agents", false, "print detected review backends as JSON")
 	flags.BoolVar(&printVersion, "version", false, "print version")
@@ -79,14 +85,12 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "\nMass path:")
 		fmt.Fprintln(stderr, "  tarakan login")
 		fmt.Fprintln(stderr, "  tarakan report --agent grok --pickup")
-		fmt.Fprintln(stderr, "  tarakan --url http://localhost:4000 --token TOKEN --agent grok --pickup  # local development")
+		fmt.Fprintln(stderr, "  tarakan worker --agent codex --min-stars 1000 --language Rust")
+		fmt.Fprintln(stderr, "  tarakan report --agent grok --pickup --lang Elixir --min-stars 100")
+		fmt.Fprintln(stderr, "  tarakan --url http://localhost:4000 --token TOKEN --agent grok --pickup")
 		fmt.Fprintln(stderr, "  tarakan report --agent grok --job ID --yes")
-		fmt.Fprintln(stderr, "  tarakan worker --agent grok")
 		fmt.Fprintln(stderr, "  tarakan register owner/name")
-		fmt.Fprintln(stderr, "  tarakan register --file repos.txt")
 		fmt.Fprintln(stderr, "  tarakan check REPORT_ID --verdict confirmed|disputed --notes TEXT")
-		fmt.Fprintln(stderr, "  tarakan check-finding UUID --verdict confirmed|disputed|fixed --notes TEXT")
-		fmt.Fprintln(stderr, "  tarakan worker --agent codex   # drains report + check jobs")
 		fmt.Fprintln(stderr, "\nInteractive: /url, /token, /config  ·  Also: jobs | claim | submit | …")
 		fmt.Fprintln(stderr, "\nUsage: tarakan [options]")
 		flags.PrintDefaults()
@@ -175,6 +179,11 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		JobID:     jobID,
 		Pickup:    pickup,
 		APIConfig: cfg,
+		Filter: api.QueueFilter{
+			MinStars: minStars,
+			Language: language,
+			Kind:     kind,
+		},
 	}))
 	if _, err := program.Run(); err != nil {
 		fmt.Fprintf(stderr, "run Tarakan: %v\n", err)
@@ -196,7 +205,7 @@ func encodeJSON(stdout, stderr io.Writer, value any) int {
 // runInteractiveJob opens the TUI. If jobID > 0, claims that job; if pickup,
 // claims the next open report job for this repo. Then runs the agent and waits
 // for /submit-report.
-func runInteractiveJob(agentName, model string, jobID int64, pickup bool, cfg api.Config, stderr io.Writer) int {
+func runInteractiveJob(agentName, model string, jobID int64, pickup bool, cfg api.Config, filter api.QueueFilter, stderr io.Writer) int {
 	repository, err := repoctx.Current()
 	if err != nil {
 		fmt.Fprintf(stderr, "discover repository: %v\n", err)
@@ -224,6 +233,7 @@ func runInteractiveJob(agentName, model string, jobID int64, pickup bool, cfg ap
 		JobID:     jobID,
 		Pickup:    pickup,
 		APIConfig: cfg,
+		Filter:    filter,
 	}))
 	if _, err := program.Run(); err != nil {
 		fmt.Fprintf(stderr, "run Tarakan: %v\n", err)

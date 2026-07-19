@@ -56,6 +56,7 @@ type Model struct {
 	// claims the next open report job for this repository.
 	startJobID  int64
 	startPickup bool
+	queueFilter api.QueueFilter
 
 	// Pending, human-reviewable artifacts awaiting an explicit submit command.
 	pendingEvidence  *pendingEvidence
@@ -67,9 +68,10 @@ type Model struct {
 
 // SessionOpts configures auto-start behavior for the interactive UI.
 type SessionOpts struct {
-	JobID     int64      // claim+run this job on start (0 = none)
-	Pickup    bool       // claim+run the next open report job on start
-	APIConfig api.Config // host URL + token (--url/--token or env)
+	JobID     int64           // claim+run this job on start (0 = none)
+	Pickup    bool            // claim+run the next open report job on start
+	APIConfig api.Config      // host URL + token (--url/--token or env)
+	Filter    api.QueueFilter // min stars / language / kind for pickup
 }
 
 func New(repository repoctx.Info, registry agent.Registry, selected agent.Provider) Model {
@@ -121,6 +123,7 @@ func NewSession(repository repoctx.Info, registry agent.Registry, selected agent
 		height:      24,
 		startJobID:  opts.JobID,
 		startPickup: pickup,
+		queueFilter: opts.Filter,
 	}
 	model.transcript.Append(session.RoleSystem, startupContextLine(repository))
 	model.transcript.Append(session.RoleSystem, "API "+apiConfig.Summary()+"  (/login to sign in; /config to inspect)")
