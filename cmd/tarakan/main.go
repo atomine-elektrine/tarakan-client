@@ -87,7 +87,6 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "  tarakan check REPORT_ID --verdict confirmed|disputed --notes TEXT")
 		fmt.Fprintln(stderr, "  tarakan check-finding UUID --verdict confirmed|disputed|fixed --notes TEXT")
 		fmt.Fprintln(stderr, "  tarakan worker --agent codex   # drains report + check jobs")
-		fmt.Fprintln(stderr, "  scripts/import_awesome_lists.sh avelino/awesome-go --max 100  # harvest projects")
 		fmt.Fprintln(stderr, "\nInteractive: /url, /token, /config  ·  Also: jobs | claim | submit | …")
 		fmt.Fprintln(stderr, "\nUsage: tarakan [options]")
 		flags.PrintDefaults()
