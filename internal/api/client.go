@@ -170,6 +170,24 @@ func (c *Client) ListReviewableRepositories(ctx context.Context, status string) 
 	return response.Repositories, nil
 }
 
+// RegisterRepository adds a public GitHub repository to Tarakan by owner/name
+// or URL. Idempotent: already-registered repos return successfully.
+func (c *Client) RegisterRepository(ctx context.Context, urlOrSlug string) (QueueRepository, error) {
+	urlOrSlug = strings.TrimSpace(urlOrSlug)
+	if urlOrSlug == "" {
+		return QueueRepository{}, errors.New("repository url is required")
+	}
+	var response struct {
+		Repository QueueRepository `json:"repository"`
+	}
+	if err := c.do(ctx, http.MethodPost, "/api/repositories", map[string]string{
+		"url": urlOrSlug,
+	}, &response); err != nil {
+		return QueueRepository{}, err
+	}
+	return response.Repository, nil
+}
+
 // ListScans returns the reviews of a repository visible to the caller. A
 // reviewer-tier credential with reviews:read sees restricted findings.
 func (c *Client) ListScans(ctx context.Context, owner, name string) ([]Scan, error) {

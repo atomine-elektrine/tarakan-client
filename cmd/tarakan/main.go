@@ -61,8 +61,8 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	var urlFlag, hostFlag, tokenFlag string
 	flags.StringVar(&prompt, "p", "", "run one prompt in headless JSON mode")
 	flags.StringVar(&prompt, "prompt", "", "run one prompt in headless JSON mode")
-	flags.StringVar(&agentName, "agent", "", "review backend: claude, codex, grok, ollama, or openrouter")
-	flags.StringVar(&model, "model", "", "override the model for HTTP backends (ollama, openrouter)")
+	flags.StringVar(&agentName, "agent", "", "review backend: claude, codex, grok, kimi, ollama, openrouter, or kimi-http")
+	flags.StringVar(&model, "model", "", "override the model for HTTP backends (ollama, openrouter, kimi-http)")
 	flags.Int64Var(&jobID, "job", 0, "open interactive UI, claim this job, and run the agent")
 	flags.BoolVar(&pickup, "pickup", false, "open interactive UI, claim next open job from the global queue, run agent")
 	flags.BoolVar(&printContext, "context", false, "print repository context as JSON")
@@ -82,7 +82,12 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "  tarakan --url http://localhost:4000 --token TOKEN --agent grok --pickup  # local development")
 		fmt.Fprintln(stderr, "  tarakan report --agent grok --job ID --yes")
 		fmt.Fprintln(stderr, "  tarakan worker --agent grok")
+		fmt.Fprintln(stderr, "  tarakan register owner/name")
+		fmt.Fprintln(stderr, "  tarakan register --file repos.txt")
 		fmt.Fprintln(stderr, "  tarakan check REPORT_ID --verdict confirmed|disputed --notes TEXT")
+		fmt.Fprintln(stderr, "  tarakan check-finding UUID --verdict confirmed|disputed|fixed --notes TEXT")
+		fmt.Fprintln(stderr, "  tarakan worker --agent codex   # drains report + check jobs")
+		fmt.Fprintln(stderr, "  scripts/import_awesome_lists.sh avelino/awesome-go --max 100  # harvest projects")
 		fmt.Fprintln(stderr, "\nInteractive: /url, /token, /config  ·  Also: jobs | claim | submit | …")
 		fmt.Fprintln(stderr, "\nUsage: tarakan [options]")
 		flags.PrintDefaults()
@@ -160,7 +165,7 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 
 	if (jobID > 0 || pickup) && selected.Name == "" {
-		fmt.Fprintln(stderr, "no review backend available; install grok/codex/claude or pass --agent")
+		fmt.Fprintln(stderr, "no review backend available; install grok/codex/claude/kimi or pass --agent")
 		return 1
 	}
 
@@ -212,7 +217,7 @@ func runInteractiveJob(agentName, model string, jobID int64, pickup bool, cfg ap
 	}
 	selected = selected.WithModel(model)
 	if selected.Name == "" {
-		fmt.Fprintln(stderr, "no review backend available; install grok/codex/claude or pass --agent")
+		fmt.Fprintln(stderr, "no review backend available; install grok/codex/claude/kimi or pass --agent")
 		return 1
 	}
 

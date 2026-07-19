@@ -24,7 +24,7 @@ import (
 
 var workCommands = map[string]struct{}{
 	// Mass-facing
-	"report": {}, "check": {}, "jobs": {}, "worker": {},
+	"report": {}, "check": {}, "check-finding": {}, "jobs": {}, "worker": {}, "register": {},
 	// Compat / advanced
 	"task": {}, "job": {}, "claim": {}, "release": {}, "submit": {}, "complete": {}, "run-task": {},
 }
@@ -47,10 +47,14 @@ func runWorkCommand(name string, arguments []string, stdin io.Reader, stdout, st
 		return runReport(ctx, arguments, stdin, stdout, stderr, cfg)
 	case "check":
 		return runCheck(ctx, arguments, stdin, stdout, stderr, cfg)
+	case "check-finding":
+		return runCheckFinding(ctx, arguments, stdin, stdout, stderr, cfg)
 	case "jobs":
 		return runJobs(ctx, arguments, stdout, stderr, cfg)
 	case "worker":
 		return runWorker(ctx, arguments, stdout, stderr, cfg)
+	case "register":
+		return runRegister(ctx, arguments, stdout, stderr, cfg)
 	case "task", "job":
 		return runTaskShow(ctx, arguments, stdout, stderr, cfg)
 	case "claim":
